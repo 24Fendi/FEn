@@ -1,0 +1,59 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.13;
+
+contract PengelolaanLimbah {
+    address public admin;
+
+    enum JenisLimbah { Plastik, Kertas, Kaca, Logam, Organik }
+
+    struct ItemLimbah {
+        address pengirim;
+        JenisLimbah jenisLimbah;
+        uint berat;
+        uint timestamp;
+        bool sudahDiproses;
+    }
+
+    mapping(uint => ItemLimbah) public itemLimbah;
+    uint public totalBeratLimbah;
+    uint public jumlahItemLimbah;
+
+    event LimbahDiterima(uint indexed idLimbah, address pengirim, JenisLimbah jenisLimbah, uint berat);
+    event LimbahDiproses(uint indexed idLimbah, address pemroses, uint beratDaurUlang);
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    modifier hanyaAdmin() {
+        require(msg.sender == admin, "Hanya admin kontrak yang dapat memanggil fungsi ini.");
+        _;
+    }
+
+    function kirimLimbah(JenisLimbah _jenisLimbah, uint _berat) external {
+        require(_berat > 0, "Berat harus lebih dari 0");
+
+        uint idLimbah = jumlahItemLimbah;
+        totalBeratLimbah += _berat;
+        itemLimbah[idLimbah] = ItemLimbah(msg.sender, _jenisLimbah, _berat, block.timestamp, false);
+        jumlahItemLimbah++;
+
+        emit LimbahDiterima(idLimbah, msg.sender, _jenisLimbah, _berat);
+    }
+
+    function prosesLimbah(uint _idLimbah, uint _beratDaurUlang) external hanyaAdmin {
+        require(_idLimbah < jumlahItemLimbah, "ID limbah tidak valid");
+        ItemLimbah storage item = itemLimbah[_idLimbah];
+        require(!item.sudahDiproses, "Limbah sudah diproses sebelumnya");
+        require(_beratDaurUlang <= item.berat, "Berat daur ulang tidak boleh melebihi berat asli");
+
+        item.sudahDiproses = true;
+        totalBeratLimbah -= _beratDaurUlang;
+
+        emit LimbahDiproses(_idLimbah, msg.sender, _beratDaurUlang);
+    }
+
+    function getJumlahItemLimbah() external view returns (uint) {
+        return jumlahItemLimbah;
+    }
+}
